@@ -8,6 +8,7 @@ This module handles import compatibility issues between Python 2 and
 Python 3.
 """
 
+# 兼容py2 和py3
 import chardet
 
 import sys
@@ -17,6 +18,7 @@ import sys
 # -------
 
 # Syntax sugar.
+# 系统信息
 _ver = sys.version_info
 
 #: Python 2.x?
@@ -25,6 +27,7 @@ is_py2 = (_ver[0] == 2)
 #: Python 3.x?
 is_py3 = (_ver[0] == 3)
 
+# json 处理
 try:
     import simplejson as json
 except ImportError:
@@ -34,6 +37,7 @@ except ImportError:
 # Specifics
 # ---------
 
+# py2 处理
 if is_py2:
     from urllib import (
         quote, unquote, quote_plus, unquote_plus, urlencode, getproxies,

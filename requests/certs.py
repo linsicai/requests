@@ -14,5 +14,6 @@ packaged CA bundle.
 """
 from certifi import where
 
+# 证书管理
 if __name__ == '__main__':
     print(where())

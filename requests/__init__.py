@@ -46,7 +46,9 @@ import warnings
 from .exceptions import RequestsDependencyWarning
 
 
+# 校验兼容性
 def check_compatibility(urllib3_version, chardet_version):
+    # urllib 版本校验
     urllib3_version = urllib3_version.split('.')
     assert urllib3_version != ['dev']  # Verify urllib3 isn't installed from git.
 
@@ -63,6 +65,7 @@ def check_compatibility(urllib3_version, chardet_version):
     assert minor <= 25
 
     # Check chardet for compatibility.
+    # 字符处理版本校验
     major, minor, patch = chardet_version.split('.')[:3]
     major, minor, patch = int(major), int(minor), int(patch)
     # chardet >= 3.0.2, < 3.1.0
@@ -79,10 +82,12 @@ def _check_cryptography(cryptography_version):
         return
 
     if cryptography_version < [1, 3, 4]:
+        # 告警
         warning = 'Old version of cryptography ({}) may cause slowdown.'.format(cryptography_version)
         warnings.warn(warning, RequestsDependencyWarning)
 
 # Check imported dependencies for compatibility.
+# 校验兼容性
 try:
     check_compatibility(urllib3.__version__, chardet.__version__)
 except (AssertionError, ValueError):
@@ -93,6 +98,7 @@ except (AssertionError, ValueError):
 # Attempt to enable urllib3's fallback for SNI support
 # if the standard library doesn't support SNI or the
 # 'ssl' library isn't available.
+# ssl
 try:
     try:
         import ssl
@@ -110,13 +116,16 @@ except ImportError:
     pass
 
 # urllib3's DependencyWarnings should be silenced.
+# 过滤告警
 from urllib3.exceptions import DependencyWarning
 warnings.simplefilter('ignore', DependencyWarning)
 
+# 版本信息
 from .__version__ import __title__, __description__, __url__, __version__
 from .__version__ import __build__, __author__, __author_email__, __license__
 from .__version__ import __copyright__, __cake__
 
+# 系统函数
 from . import utils
 from . import packages
 from .models import Request, Response, PreparedRequest
@@ -130,6 +139,7 @@ from .exceptions import (
 )
 
 # Set default logging handler to avoid "No handler found" warnings.
+# 日志处理
 import logging
 from logging import NullHandler
 

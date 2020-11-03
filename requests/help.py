@@ -58,6 +58,7 @@ def _implementation():
 
 def info():
     """Generate information for a bug report."""
+    # 系统信息
     try:
         platform_info = {
             'system': platform.system(),
@@ -69,10 +70,12 @@ def info():
             'release': 'Unknown',
         }
 
+    # 系统实现信息
     implementation_info = _implementation()
     urllib3_info = {'version': urllib3.__version__}
     chardet_info = {'version': chardet.__version__}
 
+    # ssl 版本信息
     pyopenssl_info = {
         'version': None,
         'openssl_version': '',
@@ -89,6 +92,7 @@ def info():
         'version': getattr(idna, '__version__', ''),
     }
 
+    # 系统ssl 信息
     system_ssl = ssl.OPENSSL_VERSION_NUMBER
     system_ssl_info = {
         'version': '%x' % system_ssl if system_ssl is not None else ''
@@ -110,6 +114,7 @@ def info():
     }
 
 
+# 打印帮助json
 def main():
     """Pretty-print the bug information as JSON."""
     print(json.dumps(info(), sort_keys=True, indent=2))

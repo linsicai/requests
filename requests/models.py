@@ -44,6 +44,7 @@ from .status_codes import codes
 
 #: The set of HTTP status codes that indicate an automatically
 #: processable redirect.
+# 重定向返回码
 REDIRECT_STATI = (
     codes.moved,               # 301
     codes.found,               # 302
@@ -52,7 +53,10 @@ REDIRECT_STATI = (
     codes.permanent_redirect,  # 308
 )
 
+# 默认重定向次数限制
 DEFAULT_REDIRECT_LIMIT = 30
+
+# 分块配置
 CONTENT_CHUNK_SIZE = 10 * 1024
 ITER_CHUNK_SIZE = 512
 
@@ -64,19 +68,23 @@ class RequestEncodingMixin(object):
 
         url = []
 
+        # url 拆分
         p = urlsplit(self.url)
 
+        # 解析路径
         path = p.path
         if not path:
             path = '/'
 
         url.append(path)
 
+        # 解析查询
         query = p.query
         if query:
             url.append('?')
             url.append(query)
 
+        # url?query
         return ''.join(url)
 
     @staticmethod
@@ -87,14 +95,20 @@ class RequestEncodingMixin(object):
         2-tuples. Order is retained if data is a list of 2-tuples but arbitrary
         if parameters are supplied as a dict.
         """
+        # 编码数据
 
         if isinstance(data, (str, bytes)):
+            # 字符串或数组
             return data
+
         elif hasattr(data, 'read'):
+            # 有读取函数
             return data
+
         elif hasattr(data, '__iter__'):
             result = []
             for k, vs in to_key_val_list(data):
+                # vs 转数组
                 if isinstance(vs, basestring) or not hasattr(vs, '__iter__'):
                     vs = [vs]
                 for v in vs:
@@ -102,6 +116,7 @@ class RequestEncodingMixin(object):
                         result.append(
                             (k.encode('utf-8') if isinstance(k, str) else k,
                              v.encode('utf-8') if isinstance(v, str) else v))
+            # url 编码
             return urlencode(result, doseq=True)
         else:
             return data
@@ -116,15 +131,18 @@ class RequestEncodingMixin(object):
         The tuples may be 2-tuples (filename, fileobj), 3-tuples (filename, fileobj, contentype)
         or 4-tuples (filename, fileobj, contentype, custom_headers).
         """
+        # 参数检查
         if (not files):
             raise ValueError("Files must be provided.")
         elif isinstance(data, basestring):
             raise ValueError("Data must not be a string.")
 
+        # 解析参数
         new_fields = []
         fields = to_key_val_list(data or {})
         files = to_key_val_list(files or {})
 
+        # encode 字段值
         for field, val in fields:
             if isinstance(val, basestring) or not hasattr(val, '__iter__'):
                 val = [val]
@@ -140,6 +158,7 @@ class RequestEncodingMixin(object):
 
         for (k, v) in files:
             # support for explicit filename
+            # 解析参数
             ft = None
             fh = None
             if isinstance(v, (tuple, list)):
@@ -153,6 +172,7 @@ class RequestEncodingMixin(object):
                 fn = guess_filename(v) or k
                 fp = v
 
+            # 获取文件内容
             if isinstance(fp, (str, bytes, bytearray)):
                 fdata = fp
             elif hasattr(fp, 'read'):
@@ -162,27 +182,33 @@ class RequestEncodingMixin(object):
             else:
                 fdata = fp
 
+            # 构建请求
             rf = RequestField(name=k, data=fdata, filename=fn, headers=fh)
             rf.make_multipart(content_type=ft)
             new_fields.append(rf)
 
+        # 拼body
         body, content_type = encode_multipart_formdata(new_fields)
 
         return body, content_type
 
 
 class RequestHooksMixin(object):
+    # 注册
     def register_hook(self, event, hook):
         """Properly register a hook."""
 
+        # 事件检查
         if event not in self.hooks:
             raise ValueError('Unsupported event specified, with event name "%s"' % (event))
 
+        # 单个函数或者函数列表
         if isinstance(hook, Callable):
             self.hooks[event].append(hook)
         elif hasattr(hook, '__iter__'):
             self.hooks[event].extend(h for h in hook if isinstance(h, Callable))
 
+    # 注销
     def deregister_hook(self, event, hook):
         """Deregister a previously registered hook.
         Returns True if the hook existed, False if not.
@@ -228,16 +254,19 @@ class Request(RequestHooksMixin):
             params=None, auth=None, cookies=None, hooks=None, json=None):
 
         # Default empty dicts for dict params.
+        # 参数默认值处理
         data = [] if data is None else data
         files = [] if files is None else files
         headers = {} if headers is None else headers
         params = {} if params is None else params
         hooks = {} if hooks is None else hooks
 
+        # 注册hook
         self.hooks = default_hooks()
         for (k, v) in list(hooks.items()):
             self.register_hook(event=k, hook=v)
 
+        # 初始化
         self.method = method
         self.url = url
         self.headers = headers
@@ -347,6 +376,7 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
 
     @staticmethod
     def _get_idna_encoded_host(host):
+        # host 编码
         import idna
 
         try:
@@ -362,33 +392,39 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
         #: as this will include the bytestring indicator (b'')
         #: on python 3.x.
         #: https://github.com/psf/requests/pull/2238
+        # 解析url
         if isinstance(url, bytes):
             url = url.decode('utf8')
         else:
             url = unicode(url) if is_py2 else str(url)
 
         # Remove leading whitespaces from url
+        # 去除开始的空格
         url = url.lstrip()
 
         # Don't do any URL preparation for non-HTTP schemes like `mailto`,
         # `data` etc to work around exceptions from `url_parse`, which
         # handles RFC 3986 only.
+        # 非http 请求，不做事情
         if ':' in url and not url.lower().startswith('http'):
             self.url = url
             return
 
         # Support for unicode domain names and paths.
+        # 解析url
         try:
             scheme, auth, host, port, path, query, fragment = parse_url(url)
         except LocationParseError as e:
             raise InvalidURL(*e.args)
 
+        # schema 校验
         if not scheme:
             error = ("Invalid URL {0!r}: No schema supplied. Perhaps you meant http://{0}?")
             error = error.format(to_native_string(url, 'utf8'))
 
             raise MissingSchema(error)
 
+        # host 空值校验
         if not host:
             raise InvalidURL("Invalid URL %r: No host supplied" % url)
 
@@ -396,6 +432,7 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
         # non-ASCII characters. This allows users to automatically get the correct IDNA
         # behaviour. For strings containing only ASCII characters, we need to also verify
         # it doesn't start with a wildcard (*), before allowing the unencoded hostname.
+        # 非ascii 码校验
         if not unicode_is_ascii(host):
             try:
                 host = self._get_idna_encoded_host(host)
@@ -405,6 +442,7 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
             raise InvalidURL('URL has an invalid label.')
 
         # Carefully reconstruct the network location
+        # auth@ip:port
         netloc = auth or ''
         if netloc:
             netloc += '@'
@@ -413,9 +451,11 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
             netloc += ':' + str(port)
 
         # Bare domains aren't valid URLs.
+        # 路径默认值处理
         if not path:
             path = '/'
 
+        # 字符编码处理
         if is_py2:
             if isinstance(scheme, str):
                 scheme = scheme.encode('utf-8')
@@ -428,9 +468,11 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
             if isinstance(fragment, str):
                 fragment = fragment.encode('utf-8')
 
+        # 确保参数为原生字符串
         if isinstance(params, (str, bytes)):
             params = to_native_string(params)
 
+        # 构建完整的query
         enc_params = self._encode_params(params)
         if enc_params:
             if query:
@@ -438,9 +480,11 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
             else:
                 query = enc_params
 
+        # url 规整
         url = requote_uri(urlunparse([scheme, netloc, path, None, query, fragment]))
         self.url = url
 
+    # 将headers 变为大小写无关的字典
     def prepare_headers(self, headers):
         """Prepares the given HTTP headers."""
 
@@ -462,6 +506,7 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
         body = None
         content_type = None
 
+        # json 请求处理，自动加上content type
         if not data and json is not None:
             # urllib3 requires a bytes-like body. Python 2's json.dumps
             # provides this natively, but Python 3 gives a Unicode string.
@@ -470,12 +515,14 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
             if not isinstance(body, bytes):
                 body = body.encode('utf-8')
 
+        # 是数据流？
         is_stream = all([
             hasattr(data, '__iter__'),
             not isinstance(data, (basestring, list, tuple, Mapping))
         ])
 
         if is_stream:
+            # 获取长度
             try:
                 length = super_len(data)
             except (TypeError, AttributeError, UnsupportedOperation):
@@ -483,6 +530,7 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
 
             body = data
 
+            # 找数据位置
             if getattr(body, 'tell', None) is not None:
                 # Record the current file position before reading.
                 # This will allow us to rewind a file in the event
@@ -494,15 +542,19 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
                     # a failed `tell()` later when trying to rewind the body
                     self._body_position = object()
 
+            # 请求参数冲突
             if files:
                 raise NotImplementedError('Streamed bodies and files are mutually exclusive.')
 
+            # 固定长度或者数据流
             if length:
                 self.headers['Content-Length'] = builtin_str(length)
             else:
                 self.headers['Transfer-Encoding'] = 'chunked'
+
         else:
             # Multi-part file uploads.
+            # 取内容
             if files:
                 (body, content_type) = self._encode_files(files, data)
             else:
@@ -513,9 +565,11 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
                     else:
                         content_type = 'application/x-www-form-urlencoded'
 
+            # 编码内容长度
             self.prepare_content_length(body)
 
             # Add content-type if it wasn't explicitly provided.
+            # 设置内容类型
             if content_type and ('content-type' not in self.headers):
                 self.headers['Content-Type'] = content_type
 
@@ -524,6 +578,7 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
     def prepare_content_length(self, body):
         """Prepare Content-Length header based on request method and body"""
         if body is not None:
+            # 取body 内容长度
             length = super_len(body)
             if length:
                 # If length exists, set it. Otherwise, we fallback
@@ -532,12 +587,14 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
         elif self.method not in ('GET', 'HEAD') and self.headers.get('Content-Length') is None:
             # Set Content-Length to 0 for methods that can have a body
             # but don't provide one. (i.e. not GET or HEAD)
+            # 默认值0的处理
             self.headers['Content-Length'] = '0'
 
     def prepare_auth(self, auth, url=''):
         """Prepares the given HTTP auth data."""
 
         # If no Auth is explicitly provided, extract it from the URL first.
+        # 取权限
         if auth is None:
             url_auth = get_auth_from_url(self.url)
             auth = url_auth if any(url_auth) else None
@@ -554,6 +611,7 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
             self.__dict__.update(r.__dict__)
 
             # Recompute Content-Length
+            # 重新计算长度
             self.prepare_content_length(self.body)
 
     def prepare_cookies(self, cookies):
@@ -567,17 +625,20 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
         to ``prepare_cookies`` will have no actual effect, unless the "Cookie"
         header is removed beforehand.
         """
+        # 构建cookie
         if isinstance(cookies, cookielib.CookieJar):
             self._cookies = cookies
         else:
             self._cookies = cookiejar_from_dict(cookies)
 
+        # 设置cookie header
         cookie_header = get_cookie_header(self._cookies, self)
         if cookie_header is not None:
             self.headers['Cookie'] = cookie_header
 
     def prepare_hooks(self, hooks):
         """Prepares the given hooks."""
+        # 注册hooks
         # hooks can be passed as None to the prepare method and to this
         # method. To prevent iterating over None, simply use an empty list
         # if hooks is False-y
@@ -591,6 +652,7 @@ class Response(object):
     server's response to an HTTP request.
     """
 
+    # 属性声明
     __attrs__ = [
         '_content', 'status_code', 'headers', 'url', 'history',
         'encoding', 'reason', 'cookies', 'elapsed', 'request'
@@ -649,6 +711,7 @@ class Response(object):
     def __exit__(self, *args):
         self.close()
 
+    # 序列化，取参数
     def __getstate__(self):
         # Consume everything; accessing the content attribute makes
         # sure the content has been fully read.
@@ -662,6 +725,7 @@ class Response(object):
             setattr(self, name, value)
 
         # pickled objects do not have .raw
+        # 非序列化参数设置默认值
         setattr(self, '_content_consumed', True)
         setattr(self, 'raw', None)
 
@@ -712,11 +776,13 @@ class Response(object):
         """True if this Response is a well-formed HTTP redirect that could have
         been processed automatically (by :meth:`Session.resolve_redirects`).
         """
+        # 有重定向地址和重定向返回码
         return ('location' in self.headers and self.status_code in REDIRECT_STATI)
 
     @property
     def is_permanent_redirect(self):
         """True if this Response one of the permanent versions of redirect."""
+        # 是否永久重定向
         return ('location' in self.headers and self.status_code in (codes.moved_permanently, codes.permanent_redirect))
 
     @property
@@ -729,6 +795,7 @@ class Response(object):
         """The apparent encoding, provided by the chardet library."""
         return chardet.detect(self.content)['encoding']
 
+    # TODO
     def iter_content(self, chunk_size=1, decode_unicode=False):
         """Iterates over the response data.  When stream=True is set on the
         request, this avoids reading the content at once into memory for
@@ -921,6 +988,9 @@ class Response(object):
         """Raises :class:`HTTPError`, if one occurred."""
 
         http_error_msg = ''
+
+
+        # 解析原因
         if isinstance(self.reason, bytes):
             # We attempt to decode utf-8 first because some servers
             # choose to localize their reason strings. If the string
@@ -933,12 +1003,16 @@ class Response(object):
         else:
             reason = self.reason
 
+
         if 400 <= self.status_code < 500:
+            # 客户端错误
             http_error_msg = u'%s Client Error: %s for url: %s' % (self.status_code, reason, self.url)
 
         elif 500 <= self.status_code < 600:
+            # 服务端错误
             http_error_msg = u'%s Server Error: %s for url: %s' % (self.status_code, reason, self.url)
 
+        # 有错误抛出异常
         if http_error_msg:
             raise HTTPError(http_error_msg, response=self)
 

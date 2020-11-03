@@ -52,6 +52,7 @@ DEFAULT_RETRIES = 0
 DEFAULT_POOL_TIMEOUT = None
 
 
+# 基类
 class BaseAdapter(object):
     """The Base Transport Adapter"""
 
@@ -117,6 +118,7 @@ class HTTPAdapter(BaseAdapter):
             self.max_retries = Retry(0, read=False)
         else:
             self.max_retries = Retry.from_int(max_retries)
+
         self.config = {}
         self.proxy_manager = {}
 

@@ -39,6 +39,7 @@ class CaseInsensitiveDict(MutableMapping):
     behavior is undefined.
     """
 
+    # 初始化
     def __init__(self, data=None, **kwargs):
         self._store = OrderedDict()
         if data is None:
@@ -62,6 +63,7 @@ class CaseInsensitiveDict(MutableMapping):
     def __len__(self):
         return len(self._store)
 
+    # 转tuple
     def lower_items(self):
         """Like iteritems(), but with all lowercase keys."""
         return (
@@ -75,17 +77,19 @@ class CaseInsensitiveDict(MutableMapping):
             other = CaseInsensitiveDict(other)
         else:
             return NotImplemented
+
         # Compare insensitively
         return dict(self.lower_items()) == dict(other.lower_items())
 
     # Copy is required
+    # 复制
     def copy(self):
         return CaseInsensitiveDict(self._store.values())
 
     def __repr__(self):
         return str(dict(self.items()))
 
-
+# 做容错处理
 class LookupDict(dict):
     """Dictionary lookup object."""
 

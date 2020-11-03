@@ -96,6 +96,7 @@ if sys.platform == 'win32':
             return proxy_bypass_registry(host)
 
 
+# 字典转数组
 def dict_to_sequence(d):
     """Returns an internal sequence dictionary update."""
 
@@ -105,17 +106,21 @@ def dict_to_sequence(d):
     return d
 
 
+# 获取长度
 def super_len(o):
     total_length = None
     current_position = 0
 
     if hasattr(o, '__len__'):
+        # 有函数
         total_length = len(o)
 
     elif hasattr(o, 'len'):
+        # 有属性
         total_length = o.len
 
     elif hasattr(o, 'fileno'):
+        # 是文件
         try:
             fileno = o.fileno()
         except io.UnsupportedOperation:
@@ -126,6 +131,7 @@ def super_len(o):
             # Having used fstat to determine the file length, we need to
             # confirm that this file was opened up in binary mode.
             if 'b' not in o.mode:
+                # 二进制就告警一下
                 warnings.warn((
                     "Requests has determined the content-length for this "
                     "request using the binary size of the file: however, the "
@@ -138,12 +144,14 @@ def super_len(o):
 
     if hasattr(o, 'tell'):
         try:
+            # 先取当前位置
             current_position = o.tell()
         except (OSError, IOError):
             # This can happen in some weird situations, such as when the file
             # is actually a special file descriptor like stdin. In this
             # instance, we don't know what the length is, so set it to zero and
             # let requests chunk it instead.
+            # 异常，处理至0
             if total_length is not None:
                 current_position = total_length
         else:
@@ -151,18 +159,22 @@ def super_len(o):
                 # StringIO and BytesIO have seek but no useable fileno
                 try:
                     # seek to end of file
+                    # 跳至文件尾，取大小
                     o.seek(0, 2)
                     total_length = o.tell()
 
                     # seek back to current position to support
                     # partially read file-like objects
+                    # 回退至正常值
                     o.seek(current_position or 0)
                 except (OSError, IOError):
                     total_length = 0
 
+    # 空值处理
     if total_length is None:
         total_length = 0
 
+    # 最大值
     return max(0, total_length - current_position)
 
 
@@ -217,6 +229,7 @@ def get_netrc_auth(url, raise_errors=False):
         pass
 
 
+# 猜测文件名
 def guess_filename(obj):
     """Tries to guess the filename of the given object."""
     name = getattr(obj, 'name', None)
@@ -232,31 +245,38 @@ def extract_zipped_paths(path):
     """
     if os.path.exists(path):
         # this is already a valid path, no need to do anything further
+        # 路径存在
         return path
 
     # find the first valid part of the provided path and treat that as a zip archive
     # assume the rest of the path is the name of a member in the archive
+    # 假设第一个是路径，第二个是成员
     archive, member = os.path.split(path)
     while archive and not os.path.exists(archive):
         archive, prefix = os.path.split(archive)
         member = '/'.join([prefix, member])
 
     if not zipfile.is_zipfile(archive):
+        # 非压缩包
         return path
 
     zip_file = zipfile.ZipFile(archive)
     if member not in zip_file.namelist():
+        # 压缩包格式不正确
         return path
 
     # we have a valid zip archive and a valid member of that archive
+    # 准备提取文件
     tmp = tempfile.gettempdir()
     extracted_path = os.path.join(tmp, *member.split('/'))
     if not os.path.exists(extracted_path):
         extracted_path = zip_file.extract(member, path=tmp)
 
+    # 返回提取路径
     return extracted_path
 
 
+# 构建字典
 def from_key_val_list(value):
     """Take an object and test to see if it can be represented as a
     dictionary. Unless it can not be represented as such, return an
@@ -337,6 +357,7 @@ def parse_list_header(value):
     :return: :class:`list`
     :rtype: list
     """
+    # 解析字符串，去头尾，入数组
     result = []
     for item in _parse_list_header(value):
         if item[:1] == item[-1:] == '"':
@@ -369,11 +390,15 @@ def parse_dict_header(value):
     :rtype: dict
     """
     result = {}
+    # 解析kv
     for item in _parse_list_header(value):
         if '=' not in item:
+            # 空值
             result[item] = None
             continue
+        # 解析出key
         name, value = item.split('=', 1)
+        # 解析出字符串
         if value[:1] == value[-1:] == '"':
             value = unquote_header_value(value[1:-1])
         result[name] = value
@@ -406,6 +431,7 @@ def unquote_header_value(value, is_filename=False):
     return value
 
 
+# cookie 转字典
 def dict_from_cookiejar(cj):
     """Returns a key/value dictionary from a CookieJar.
 
@@ -420,7 +446,7 @@ def dict_from_cookiejar(cj):
 
     return cookie_dict
 
-
+# 添加cookie
 def add_dict_to_cookiejar(cj, cookie_dict):
     """Returns a CookieJar from a key/value dictionary.
 
@@ -432,17 +458,20 @@ def add_dict_to_cookiejar(cj, cookie_dict):
     return cookiejar_from_dict(cookie_dict, cj)
 
 
+# 获取内容编码
 def get_encodings_from_content(content):
     """Returns encodings from given content string.
 
     :param content: bytestring to extract encodings from.
     """
+    # 告警
     warnings.warn((
         'In requests 3.0, get_encodings_from_content will be removed. For '
         'more information, please see the discussion on issue #2266. (This'
         ' warning should only appear once.)'),
         DeprecationWarning)
 
+    # 用正则解析出字符集
     charset_re = re.compile(r'<meta.*?charset=["\']*(.+?)["\'>]', flags=re.I)
     pragma_re = re.compile(r'<meta.*?content=["\']*;?charset=(.+?)["\'>]', flags=re.I)
     xml_re = re.compile(r'^<\?xml.*?encoding=["\']*(.+?)["\'>]')
@@ -452,6 +481,7 @@ def get_encodings_from_content(content):
             xml_re.findall(content))
 
 
+# 解析头部内容
 def _parse_content_type_header(header):
     """Returns content type and parameters from given header
 
@@ -460,23 +490,35 @@ def _parse_content_type_header(header):
          parameters
     """
 
+    # 分词
     tokens = header.split(';')
+
+    # 取出内容类型
     content_type, params = tokens[0].strip(), tokens[1:]
+
+    # 解析出参数字典
     params_dict = {}
+
+    # 需要去除头尾的字符
     items_to_strip = "\"' "
 
+    # 遍历参数
     for param in params:
+        # 去头尾空格等
         param = param.strip()
         if param:
             key, value = param, True
+            # 解析出kv
             index_of_equals = param.find("=")
             if index_of_equals != -1:
                 key = param[:index_of_equals].strip(items_to_strip)
                 value = param[index_of_equals + 1:].strip(items_to_strip)
+            # 入参数字典
             params_dict[key.lower()] = value
     return content_type, params_dict
 
 
+# 获取编码
 def get_encoding_from_headers(headers):
     """Returns encodings from given HTTP Header Dict.
 
@@ -484,6 +526,7 @@ def get_encoding_from_headers(headers):
     :rtype: str
     """
 
+    # 取编码类型
     content_type = headers.get('content-type')
 
     if not content_type:
@@ -491,6 +534,7 @@ def get_encoding_from_headers(headers):
 
     content_type, params = _parse_content_type_header(content_type)
 
+    # 返回字符集
     if 'charset' in params:
         return params['charset'].strip("'\"")
 
@@ -506,21 +550,28 @@ def stream_decode_response_unicode(iterator, r):
             yield item
         return
 
+    # 获取解码器
     decoder = codecs.getincrementaldecoder(r.encoding)(errors='replace')
+
+    # 解码分块
     for chunk in iterator:
         rv = decoder.decode(chunk)
         if rv:
             yield rv
+
+    # 触发结束？
     rv = decoder.decode(b'', final=True)
     if rv:
         yield rv
 
 
+# 长字符串分块
 def iter_slices(string, slice_length):
     """Iterate over slices of a string."""
     pos = 0
     if slice_length is None or slice_length <= 0:
         slice_length = len(string)
+
     while pos < len(string):
         yield string[pos:pos + slice_length]
         pos += slice_length
@@ -538,6 +589,7 @@ def get_unicode_from_response(r):
 
     :rtype: str
     """
+    # 告警
     warnings.warn((
         'In requests 3.0, get_unicode_from_response will be removed. For '
         'more information, please see the discussion on issue #2266. (This'
@@ -547,8 +599,10 @@ def get_unicode_from_response(r):
     tried_encodings = []
 
     # Try charset from content-type
+    # 从http 头部获取编码
     encoding = get_encoding_from_headers(r.headers)
 
+    # 根据内容获取编码
     if encoding:
         try:
             return str(r.content, encoding)
@@ -556,6 +610,7 @@ def get_unicode_from_response(r):
             tried_encodings.append(encoding)
 
     # Fall back:
+    # 尝试解码
     try:
         return str(r.content, encoding, errors='replace')
     except TypeError:
@@ -573,24 +628,31 @@ def unquote_unreserved(uri):
 
     :rtype: str
     """
+    # 分块
     parts = uri.split('%')
     for i in range(1, len(parts)):
+        # 每次取两个
         h = parts[i][0:2]
+
         if len(h) == 2 and h.isalnum():
+            # 解析十六进制
             try:
                 c = chr(int(h, 16))
             except ValueError:
                 raise InvalidURL("Invalid percent-escape sequence: '%s'" % h)
 
+            # 保留字符的处理
             if c in UNRESERVED_SET:
                 parts[i] = c + parts[i][2:]
             else:
                 parts[i] = '%' + parts[i]
         else:
+            # 原文
             parts[i] = '%' + parts[i]
     return ''.join(parts)
 
 
+# 尝试解码后再编码，确保全部被编码
 def requote_uri(uri):
     """Re-quote the given URI.
 
@@ -621,13 +683,21 @@ def address_in_network(ip, net):
 
     :rtype: bool
     """
+    # 取ip 地址
     ipaddr = struct.unpack('=L', socket.inet_aton(ip))[0]
+
+    # ？
     netaddr, bits = net.split('/')
+
+    # 解析子网掩码
     netmask = struct.unpack('=L', socket.inet_aton(dotted_netmask(int(bits))))[0]
+
+    # ？
     network = struct.unpack('=L', socket.inet_aton(netaddr))[0] & netmask
+
     return (ipaddr & netmask) == (network & netmask)
 
-
+# 获取子网掩码地址
 def dotted_netmask(mask):
     """Converts mask from /xx format to xxx.xxx.xxx.xxx
 
@@ -639,6 +709,7 @@ def dotted_netmask(mask):
     return socket.inet_ntoa(struct.pack('>I', bits))
 
 
+# 是否ipv4
 def is_ipv4_address(string_ip):
     """
     :rtype: bool
@@ -674,6 +745,7 @@ def is_valid_cidr(string_network):
     return True
 
 
+# 设置环境变量
 @contextlib.contextmanager
 def set_environ(env_name, value):
     """Set the environment variable 'env_name' to 'value'
@@ -682,13 +754,16 @@ def set_environ(env_name, value):
     the environment variable 'env_name'.
 
     If 'value' is None, do nothing"""
+    # 设置环境变量
     value_changed = value is not None
     if value_changed:
         old_value = os.environ.get(env_name)
         os.environ[env_name] = value
     try:
+        # 协和切换
         yield
     finally:
+        # 复原
         if value_changed:
             if old_value is None:
                 del os.environ[env_name]
@@ -696,6 +771,7 @@ def set_environ(env_name, value):
                 os.environ[env_name] = old_value
 
 
+# TODO
 def should_bypass_proxies(url, no_proxy):
     """
     Returns whether we should bypass proxies or not.
@@ -704,6 +780,7 @@ def should_bypass_proxies(url, no_proxy):
     """
     # Prioritize lowercase environment variables over uppercase
     # to keep a consistent behaviour with other http projects (curl, wget).
+    # 获取代理函数
     get_proxy = lambda k: os.environ.get(k) or os.environ.get(k.upper())
 
     # First check whether no_proxy is defined. If it is, check that the URL
@@ -711,8 +788,9 @@ def should_bypass_proxies(url, no_proxy):
     no_proxy_arg = no_proxy
     if no_proxy is None:
         no_proxy = get_proxy('no_proxy')
-    parsed = urlparse(url)
 
+    # 解析网址
+    parsed = urlparse(url)
     if parsed.hostname is None:
         # URLs don't always have hostnames, e.g. file:/// urls.
         return True
@@ -757,6 +835,7 @@ def should_bypass_proxies(url, no_proxy):
     return False
 
 
+# 智能选择是否需要代理
 def get_environ_proxies(url, no_proxy=None):
     """
     Return a dict of environment proxies.
@@ -769,6 +848,7 @@ def get_environ_proxies(url, no_proxy=None):
         return getproxies()
 
 
+# TODO
 def select_proxy(url, proxies):
     """Select a proxy for the url, if applicable.
 
@@ -795,6 +875,7 @@ def select_proxy(url, proxies):
     return proxy
 
 
+# 默认ua
 def default_user_agent(name="python-requests"):
     """
     Return a string representing the default user agent.
@@ -804,6 +885,7 @@ def default_user_agent(name="python-requests"):
     return '%s/%s' % (name, __version__)
 
 
+# 默认http 头部
 def default_headers():
     """
     :rtype: requests.structures.CaseInsensitiveDict
@@ -816,6 +898,7 @@ def default_headers():
     })
 
 
+# TODO
 def parse_header_links(value):
     """Return a list of parsed link headers proxies.
 
@@ -859,6 +942,7 @@ _null2 = _null * 2
 _null3 = _null * 3
 
 
+# 猜测是否utf8
 def guess_json_utf(data):
     """
     :rtype: str
@@ -866,13 +950,19 @@ def guess_json_utf(data):
     # JSON always starts with two ASCII characters, so detection is as
     # easy as counting the nulls and from their location and count
     # determine the encoding. Also detect a BOM, if present.
+    # 取头4个字符
     sample = data[:4]
     if sample in (codecs.BOM_UTF32_LE, codecs.BOM_UTF32_BE):
+        # 有utf8 头部
         return 'utf-32'     # BOM included
     if sample[:3] == codecs.BOM_UTF8:
         return 'utf-8-sig'  # BOM included, MS style (discouraged)
+
+    # utf16
     if sample[:2] in (codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE):
         return 'utf-16'     # BOM included
+
+    # 算null 数目
     nullcount = sample.count(_null)
     if nullcount == 0:
         return 'utf-8'
@@ -888,6 +978,8 @@ def guess_json_utf(data):
         if sample[1:] == _null3:
             return 'utf-32-le'
         # Did not detect a valid UTF-32 ascii-range character
+
+    # 不是utf8
     return None
 
 
@@ -897,6 +989,7 @@ def prepend_scheme_if_needed(url, new_scheme):
 
     :rtype: str
     """
+    # utl 解析
     scheme, netloc, path, params, query, fragment = urlparse(url, new_scheme)
 
     # urlparse is a finicky beast, and sometimes decides that there isn't a
@@ -905,6 +998,7 @@ def prepend_scheme_if_needed(url, new_scheme):
     if not netloc:
         netloc, path = path, netloc
 
+    # 编码
     return urlunparse((scheme, netloc, path, params, query, fragment))
 
 
@@ -914,8 +1008,10 @@ def get_auth_from_url(url):
 
     :rtype: (str,str)
     """
+    # 解析url
     parsed = urlparse(url)
 
+    # 获取url
     try:
         auth = (unquote(parsed.username), unquote(parsed.password))
     except (AttributeError, TypeError):
@@ -929,6 +1025,7 @@ _CLEAN_HEADER_REGEX_BYTE = re.compile(b'^\\S[^\\r\\n]*$|^$')
 _CLEAN_HEADER_REGEX_STR = re.compile(r'^\S[^\r\n]*$|^$')
 
 
+# 使用正则校验校验header
 def check_header_validity(header):
     """Verifies that header value is a string which doesn't contain
     leading whitespace or return characters. This prevents unintended
@@ -950,6 +1047,7 @@ def check_header_validity(header):
                             "bytes, not %s" % (name, value, type(value)))
 
 
+# 正则化
 def urldefragauth(url):
     """
     Given a url remove the fragment and the authentication part.
@@ -966,13 +1064,17 @@ def urldefragauth(url):
 
     return urlunparse((scheme, netloc, path, params, query, ''))
 
-
+# 回退
 def rewind_body(prepared_request):
     """Move file pointer back to its recorded starting position
     so it can be read again on redirect.
     """
+    # 找seek 函数
     body_seek = getattr(prepared_request.body, 'seek', None)
+
+    # 找位置信息
     if body_seek is not None and isinstance(prepared_request._body_position, integer_types):
+        # 定位
         try:
             body_seek(prepared_request._body_position)
         except (IOError, OSError):

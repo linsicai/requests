@@ -14,8 +14,10 @@ import time
 import calendar
 
 from ._internal_utils import to_native_string
+
 from .compat import cookielib, urlparse, urlunparse, Morsel, MutableMapping
 
+# 多线程
 try:
     import threading
 except ImportError:
@@ -35,8 +37,13 @@ class MockRequest(object):
     """
 
     def __init__(self, request):
+        # 原始请求
         self._r = request
+
+        # 新头部
         self._new_headers = {}
+
+        # 协议类型
         self.type = urlparse(self._r.url).scheme
 
     def get_type(self):
@@ -53,7 +60,9 @@ class MockRequest(object):
         # header
         if not self._r.headers.get('Host'):
             return self._r.url
+
         # If they did set it, retrieve it and reconstruct the expected domain
+        # 使用头部里面的host
         host = to_native_string(self._r.headers['Host'], encoding='utf-8')
         parsed = urlparse(self._r.url)
         # Reconstruct the URL as we expect it
@@ -68,6 +77,7 @@ class MockRequest(object):
     def has_header(self, name):
         return name in self._r.headers or name in self._new_headers
 
+    # 优先使用老头部
     def get_header(self, name, default=None):
         return self._r.headers.get(name, self._new_headers.get(name, default))
 
@@ -122,9 +132,12 @@ def extract_cookies_to_jar(jar, request, response):
     :param request: our own requests.Request object
     :param response: urllib3.HTTPResponse object
     """
+    # 如果没有原始响应，不做事情
     if not (hasattr(response, '_original_response') and
             response._original_response):
         return
+
+    # 构建请求与响应，提取cookie
     # the _original_response field is the wrapped httplib.HTTPResponse object,
     req = MockRequest(request)
     # pull out the HTTPMessage with the headers and put it in the mock:
@@ -148,6 +161,7 @@ def remove_cookie_by_name(cookiejar, name, domain=None, path=None):
 
     Wraps CookieJar.clear(), is O(n).
     """
+    # 找需要删除的
     clearables = []
     for cookie in cookiejar:
         if cookie.name != name:
@@ -158,6 +172,7 @@ def remove_cookie_by_name(cookiejar, name, domain=None, path=None):
             continue
         clearables.append((cookie.domain, cookie.path, cookie.name))
 
+    # 做删除
     for domain, path, name in clearables:
         cookiejar.clear(domain, path, name)
 
@@ -204,14 +219,18 @@ class RequestsCookieJar(cookielib.CookieJar, MutableMapping):
         multiple domains.
         """
         # support client code that unsets cookies by assignment of a None value:
+        # 删除操作
         if value is None:
             remove_cookie_by_name(self, name, domain=kwargs.get('domain'), path=kwargs.get('path'))
             return
 
+        # 解析value 值
         if isinstance(value, Morsel):
             c = morsel_to_cookie(value)
         else:
             c = create_cookie(name, value, **kwargs)
+
+        # 设置cookie
         self.set_cookie(c)
         return c
 
@@ -267,6 +286,7 @@ class RequestsCookieJar(cookielib.CookieJar, MutableMapping):
         """
         return list(self.iteritems())
 
+    # 找所有域
     def list_domains(self):
         """Utility method to list all the domains in the jar."""
         domains = []
@@ -275,6 +295,7 @@ class RequestsCookieJar(cookielib.CookieJar, MutableMapping):
                 domains.append(cookie.domain)
         return domains
 
+    # 找所有path
     def list_paths(self):
         """Utility method to list all the paths in the jar."""
         paths = []
@@ -283,6 +304,7 @@ class RequestsCookieJar(cookielib.CookieJar, MutableMapping):
                 paths.append(cookie.path)
         return paths
 
+    # 是否多个域
     def multiple_domains(self):
         """Returns True if there are multiple domains in the jar.
         Returns False otherwise.
@@ -296,6 +318,7 @@ class RequestsCookieJar(cookielib.CookieJar, MutableMapping):
             domains.append(cookie.domain)
         return False  # there is only one domain in jar
 
+    # 获取cookie 字典
     def get_dict(self, domain=None, path=None):
         """Takes as an argument an optional domain and path and returns a plain
         old Python dict of name-value pairs of cookies that meet the
@@ -429,7 +452,9 @@ def _copy_cookie_jar(jar):
 
     if hasattr(jar, 'copy'):
         # We're dealing with an instance of RequestsCookieJar
+        # 优先调用copy 函数   
         return jar.copy()
+
     # We're dealing with a generic CookieJar instance
     new_jar = copy.copy(jar)
     new_jar.clear()
@@ -460,6 +485,7 @@ def create_cookie(name, value, **kwargs):
         'rfc2109': False,
     }
 
+    # 参数校验
     badargs = set(kwargs) - set(result)
     if badargs:
         err = 'create_cookie() got unexpected keyword arguments: %s'
@@ -477,6 +503,7 @@ def create_cookie(name, value, **kwargs):
 def morsel_to_cookie(morsel):
     """Convert a Morsel object into a Cookie containing the one k/v pair."""
 
+    # 校验时效性
     expires = None
     if morsel['max-age']:
         try:
@@ -488,6 +515,7 @@ def morsel_to_cookie(morsel):
         expires = calendar.timegm(
             time.strptime(morsel['expires'], time_template)
         )
+
     return create_cookie(
         comment=morsel['comment'],
         comment_url=bool(morsel['comment']),
@@ -514,6 +542,7 @@ def cookiejar_from_dict(cookie_dict, cookiejar=None, overwrite=True):
         already in the jar with new ones.
     :rtype: CookieJar
     """
+    # 新建一个cookie
     if cookiejar is None:
         cookiejar = RequestsCookieJar()
 
@@ -533,9 +562,11 @@ def merge_cookies(cookiejar, cookies):
     :param cookies: Dictionary or CookieJar object to be added.
     :rtype: CookieJar
     """
+    # 校验入参
     if not isinstance(cookiejar, cookielib.CookieJar):
         raise ValueError('You can only merge into CookieJar')
 
+    # 合并
     if isinstance(cookies, dict):
         cookiejar = cookiejar_from_dict(
             cookies, cookiejar=cookiejar, overwrite=False)

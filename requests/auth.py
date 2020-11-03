@@ -36,6 +36,7 @@ def _basic_auth_str(username, password):
     # These are here solely to maintain backwards compatibility
     # for things like ints. This will be removed in 3.0.0.
     if not isinstance(username, basestring):
+        # 告警
         warnings.warn(
             "Non-string usernames will no longer be supported in Requests "
             "3.0.0. Please convert the object you've passed in ({!r}) to "
@@ -46,6 +47,7 @@ def _basic_auth_str(username, password):
         username = str(username)
 
     if not isinstance(password, basestring):
+        # 告警
         warnings.warn(
             "Non-string passwords will no longer be supported in Requests "
             "3.0.0. Please convert the object you've passed in ({!r}) to "
@@ -62,6 +64,7 @@ def _basic_auth_str(username, password):
     if isinstance(password, str):
         password = password.encode('latin1')
 
+    # basic + b64编码
     authstr = 'Basic ' + to_native_string(
         b64encode(b':'.join((username, password))).strip()
     )
@@ -76,6 +79,7 @@ class AuthBase(object):
         raise NotImplementedError('Auth hooks must be callable.')
 
 
+# 基础鉴权
 class HTTPBasicAuth(AuthBase):
     """Attaches HTTP Basic Authentication to the given Request object."""
 
@@ -84,6 +88,7 @@ class HTTPBasicAuth(AuthBase):
         self.password = password
 
     def __eq__(self, other):
+        # 所有条件相等
         return all([
             self.username == getattr(other, 'username', None),
             self.password == getattr(other, 'password', None)
@@ -92,11 +97,13 @@ class HTTPBasicAuth(AuthBase):
     def __ne__(self, other):
         return not self == other
 
+    # 设置header 信息
     def __call__(self, r):
         r.headers['Authorization'] = _basic_auth_str(self.username, self.password)
         return r
 
 
+# 代理鉴权
 class HTTPProxyAuth(HTTPBasicAuth):
     """Attaches HTTP Proxy Authentication to a given Request object."""
 
@@ -105,6 +112,7 @@ class HTTPProxyAuth(HTTPBasicAuth):
         return r
 
 
+# TODO
 class HTTPDigestAuth(AuthBase):
     """Attaches HTTP Digest Authentication to the given Request object."""
 

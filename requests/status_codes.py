@@ -104,6 +104,7 @@ _codes = {
 
 codes = LookupDict(name='status_codes')
 
+# 遍历配置，做标题到返回码的映射，包括大写标题
 def _init():
     for code, titles in _codes.items():
         for title in titles:
@@ -111,6 +112,7 @@ def _init():
             if not title.startswith(('\\', '/')):
                 setattr(codes, title.upper(), code)
 
+    # 更新一下文档
     def doc(code):
         names = ', '.join('``%s``' % n for n in _codes[code])
         return '* %d: %s' % (code, names)

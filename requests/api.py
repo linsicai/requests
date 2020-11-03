@@ -85,6 +85,7 @@ def options(url, **kwargs):
     :rtype: requests.Response
     """
 
+    # 默认允许重定向
     kwargs.setdefault('allow_redirects', True)
     return request('options', url, **kwargs)
 

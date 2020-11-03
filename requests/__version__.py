@@ -2,6 +2,7 @@
 # |(  |-  |.| | | |-  `-.  |  `-.
 # ' ' `-' `-`.`-' `-' `-'  '  `-'
 
+# 版本信息
 __title__ = 'requests'
 __description__ = 'Python HTTP for Humans.'
 __url__ = 'https://requests.readthedocs.io'
